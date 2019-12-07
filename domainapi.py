@@ -1,6 +1,7 @@
 import requests as r 
 import configparser
 import modin.pandas as pd
+#import pandas as pd
 import json
 from price_parser import Price
 from datetime import datetime
@@ -21,6 +22,56 @@ class domain:
     def _init_(self):
         version = datetime.now()
         self.version = str(version).replace('-','').replace(' ','')[:10]
+
+    def clean_listings(data):
+        results = pd.DataFrame(columns=['id','advertiser_type','advertiser_id','price','price_min','price_max','features','property_type','bathrooms','bedrooms','carspaces','region','suburb','postcode','address','latitude','longitude','headline','description','labels','listingSlug'])
+        for item in data:
+            try:
+                id = item['listing']['id']
+                advertiser_type = item['listing']['advertiser']['type']
+                advertiser_id = item['listing']['advertiser']['id']
+                price = item['listing']['priceDetails']['displayPrice']
+                if 'auction' in price.lower():
+                    price_min = 'AUCTION'
+                    price_max = 'AUCTION'
+                    price = 'AUCTION'
+                elif 'contact' in price.lower():
+                    price_min = 'CONTACT'
+                    price_max = 'CONTACT'
+                    price = 'CONTACT'
+                elif any(str.isdigit(c) for c in price):
+                    price_min_ = Price.fromstring(str(price))
+                    price_min = price_min_.amount
+                    price_max = price.replace(str(price_min_.amount_text),'')
+                    price_max = Price.fromstring(str(price_max))
+                    price_max = price_max.amount
+                else:
+                    price_min = 'NA'
+                    price_max = 'NA'
+                    price = 'NA'
+                features = item['listing']['propertyDetails']['features']
+                property_type = item['listing']['propertyDetails']['propertyType']
+                bathrooms = item['listing']['propertyDetails']['bathrooms']
+                bedrooms = item['listing']['propertyDetails']['bedrooms']
+                carspaces = item['listing']['propertyDetails']['carspaces']
+                region = item['listing']['propertyDetails']['region']
+                suburb = item['listing']['propertyDetails']['suburb']
+                postcode = item['listing']['propertyDetails']['postcode']
+                address = item['listing']['propertyDetails']['displayableAddress']
+                latitude = item['listing']['propertyDetails']['latitude']
+                longitude = item['listing']['propertyDetails']['longitude']
+                headline = item['listing']['headline']
+                description = item['listing']['summaryDescription']
+                labels = item['listing']['labels']
+                listingSlug = item['listing']['listingSlug']
+
+                dict_row = {'id':id, 'advertiser_type':advertiser_type,'advertiser_id':advertiser_id, 'price':price,'price_min':price_min,'price_max':price_max,'features':features,'property_type':property_type,'bathrooms':bathrooms,'bedrooms':bedrooms,'carspaces':carspaces,'region':region,'suburb':suburb,'postcode':postcode,'address':address,'latitude':latitude,'longitude':longitude,'headline':headline,'description':description,'labels':labels,'listingSlug':listingSlug}
+
+                results = results.append(dict_row, ignore_index=True)
+            except Exception as e:
+                pass
+                #return ('processing_error',e) 
+        return results
 
     def sales_results(self,city):
         '''docstring'''
@@ -90,58 +141,21 @@ class domain:
         if int(result_count) < int(pagin_count):
             print('hit single processing')
             data = listings_call.json()
-            for item in data:
-                try:
-                    #print(item)
-                    id = item['listing']['id']
-                    advertiser_type = item['listing']['advertiser']['type']
-                    advertiser_id = item['listing']['advertiser']['id']
-                    price = item['listing']['priceDetails']['displayPrice']
-                    if 'auction' in price.lower():
-                        price_min = 'AUCTION'
-                        price_max = 'AUCTION'
-                        price = 'AUCTION'
-                    elif 'contact' in price.lower():
-                        price_min = 'CONTACT'
-                        price_max = 'CONTACT'
-                        price = 'CONTACT'
-                    elif any(str.isdigit(c) for c in price):
-                        price_min_ = Price.fromstring(str(price))
-                        price_min = price_min_.amount
-                        price_max = price.replace(str(price_min_.amount_text),'')
-                        price_max = Price.fromstring(str(price_max))
-                        price_max = price_max.amount
-                    else:
-                        price_min = 'NA'
-                        price_max = 'NA'
-                        price = 'NA'
-                    features = item['listing']['propertyDetails']['features']
-                    property_type = item['listing']['propertyDetails']['propertyType']
-                    bathrooms = item['listing']['propertyDetails']['bathrooms']
-                    bedrooms = item['listing']['propertyDetails']['bedrooms']
-                    carspaces = item['listing']['propertyDetails']['carspaces']
-                    region = item['listing']['propertyDetails']['region']
-                    suburb = item['listing']['propertyDetails']['suburb']
-                    postcode = item['listing']['propertyDetails']['postcode']
-                    address = item['listing']['propertyDetails']['displayableAddress']
-                    latitude = item['listing']['propertyDetails']['latitude']
-                    longitude = item['listing']['propertyDetails']['longitude']
-                    headline = item['listing']['headline']
-                    description = item['listing']['summaryDescription']
-                    labels = item['listing']['labels']
-                    listingSlug = item['listing']['listingSlug']
-
-                    dict_row = {'id':id, 'advertiser_type':advertiser_type,'advertiser_id':advertiser_id, 'price':price,'price_min':price_min,'price_max':price_max,'features':features,'property_type':property_type,'bathrooms':bathrooms,'bedrooms':bedrooms,'carspaces':carspaces,'region':region,'suburb':suburb,'postcode':postcode,'address':address,'latitude':latitude,'longitude':longitude,'headline':headline,'description':description,'labels':labels,'listingSlug':listingSlug}
-
-                    results = results.append(dict_row, ignore_index=True)
-                except Exception as e:
-                    print('processing error: ',e) 
+            results = domain.clean_listings(data)
             return results
+        
+
         elif int(result_count) > int(pagin_count):
-            print('hit loop processing')
-            pages = int(int(result_count)/int(pagin_count))
-            for i in range(1,pages):
-                page = int(i)
+            pag_results = pd.DataFrame()
+            pages = int(int(result_count)/int(pagin_count))+1
+            if pages > 10: #built to mitigate the paging issue (limited to 1000 results)
+                pages = 9
+            else:
+                pass
+            print("pages calced: ", pages)
+            for i in range(0,pages):
+                page = int(i)+1 #additonal iteration as domain api starts from 1 not 0
+                print("********next loop***********")
                 print("page: ",page)
                 globals()['listings_params'+str(i)] = {
                 "listingType":"Sale",
@@ -163,7 +177,6 @@ class domain:
                     }],
                 "pageSize":100
                 } 
-                
                 globals()['listings_params'+str(i)] = json.dumps(globals()['listings_params'+str(i)])
                 print(globals()['listings_params'+str(i)])
                 headers = {'X-API-Key': domain.api_secret, 'Content-Type':'application/json'}
@@ -178,52 +191,20 @@ class domain:
                 print("total count: ",globals()['listings_call'+str(i)].headers['X-Total-Count'])
                 print("pagination number: ", globals()['listings_call'+str(i)].headers['X-Pagination-PageNumber'])
                 globals()['data'+str(i)] = globals()['listings_call'+str(i)].json()
-                for item in globals()['data'+str(i)]:
-                    try:
-                        print('hit processing loop')
-                        id = item['listing']['id']
-                        advertiser_type = item['listing']['advertiser']['type']
-                        advertiser_id = item['listing']['advertiser']['id']
-                        price = item['listing']['priceDetails']['displayPrice']
-                        if 'auction' in price.lower():
-                            price_min = 'AUCTION'
-                            price_max = 'AUCTION'
-                            price = 'AUCTION'
-                        elif 'contact' in price.lower():
-                            price_min = 'CONTACT'
-                            price_max = 'CONTACT'
-                            price = 'CONTACT'
-                        elif any(str.isdigit(c) for c in price):
-                            price_min_ = Price.fromstring(str(price))
-                            price_min = price_min_.amount
-                            price_max = price.replace(str(price_min_.amount_text),'')
-                            price_max = Price.fromstring(str(price_max))
-                            price_max = price_max.amount
-                        else:
-                            price_min = 'NA'
-                            price_max = 'NA'
-                            price = 'NA'
-                        features = item['listing']['propertyDetails']['features']
-                        property_type = item['listing']['propertyDetails']['propertyType']
-                        bathrooms = item['listing']['propertyDetails']['bathrooms']
-                        bedrooms = item['listing']['propertyDetails']['bedrooms']
-                        carspaces = item['listing']['propertyDetails']['carspaces']
-                        region = item['listing']['propertyDetails']['region']
-                        suburb = item['listing']['propertyDetails']['suburb']
-                        postcode = item['listing']['propertyDetails']['postcode']
-                        address = item['listing']['propertyDetails']['displayableAddress']
-                        latitude = item['listing']['propertyDetails']['latitude']
-                        longitude = item['listing']['propertyDetails']['longitude']
-                        headline = item['listing']['headline']
-                        description = item['listing']['summaryDescription']
-                        labels = item['listing']['labels']
-                        listingSlug = item['listing']['listingSlug']
+                globals()['df_'+str(i)] = domain.clean_listings(globals()['data'+str(i)])
 
-                        globals()['dict'+str(i)] = {'id':id, 'advertiser_type':advertiser_type,'advertiser_id':advertiser_id, 'price':price,'price_min':price_min,'price_max':price_max,'features':features,'property_type':property_type,'bathrooms':bathrooms,'bedrooms':bedrooms,'carspaces':carspaces,'region':region,'suburb':suburb,'postcode':postcode,'address':address,'latitude':latitude,'longitude':longitude,'headline':headline,'description':description,'labels':labels,'listingSlug':listingSlug}
-                        results = results.append(globals()['dict'+str(i)], ignore_index=True)
-                    except Exception as e:
-                        print('processing error: ',e) 
-            return results
+                #pag_results = pd.concat([pag_results,globals()['df_'+str(i)]],ignore_index=True)
+            
+            frames = []
+            for x in range(0,pages):
+                frames.append(globals()['df_'+str(x)])
+            print("frame list length: ", len(frames))
+            print(frames)
+            try:
+               pag_results = pd.concat(frames)
+            except Exception as e:
+               print('Error in append loop: ', e)
+            return pag_results
 
     def listing_single(self, ID):
         '''docstring'''
