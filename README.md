@@ -22,3 +22,8 @@ pip3 install jsonmerge
 
 # Research
 https://medium.com/geoai/house-hunting-the-data-scientist-way-b32d93f5a42f
+
+## Contact
+[LinkedIn](https://www.linkedin.com/in/ai-specialist-data-science/) <br />
+[Website](www.jmannings.io) <br />
+[Email](mailto:jerry.mannings@gmail.com) <br />
