@@ -1,6 +1,6 @@
 # property_monitor
 
-Opensourced due to mostly abandoning it!
+Work in progress!
 
 # Datadown.py
 Using modin for dataframe speed: pip install modin[dask]
